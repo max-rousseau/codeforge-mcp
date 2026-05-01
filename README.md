@@ -81,9 +81,9 @@ flowchart LR
     MCP -->|filtered Docker API| Sock
     Sock -.->|docker exec stdin| SB
     SB -->|fetch — token names| PX
-    PX -->|TLS reterminate + creds injected<br/>+ UA normalized + PII redacted| API
+    PX -->|"TLS reterminate + creds injected<br/>+ UA normalized + PII redacted"| API
     API -->|response| PX
-    PX -->|reverse-substituted<br/>(creds → token names)| SB
+    PX -->|"reverse-substituted<br/>(creds → token names)"| SB
 ```
 
 The sandbox is on `sandbox-net` only — it has no route to anything except the proxy. The proxy straddles both networks, which is how sandbox traffic reaches the internet. The mcp-server is on `external-net` only and reaches the sandbox indirectly via the host's Docker socket (mounted read-only and further filtered by `docker-proxy.cjs` to three exec routes).

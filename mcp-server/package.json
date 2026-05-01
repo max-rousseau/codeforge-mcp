@@ -1,0 +1,37 @@
+{
+  "name": "mcp-codeforge",
+  "version": "1.0.0",
+  "description": "CodeForge MCP Server — Deno TypeScript sandbox with transparent API proxy",
+  "license": "BSD-3-Clause",
+  "author": "Max Rousseau",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/max-rousseau/codeforge-mcp",
+    "directory": "mcp-server"
+  },
+  "bugs": {
+    "url": "https://github.com/max-rousseau/codeforge-mcp/issues"
+  },
+  "homepage": "https://github.com/max-rousseau/codeforge-mcp#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "dockerode": "^4.0.4",
+    "fast-glob": "^3.3.3",
+    "yaml": "^2.8.3",
+    "zod": "^3.25"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^3.3.34",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

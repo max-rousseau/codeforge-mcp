@@ -1,0 +1,61 @@
+# Single source of truth for all LLM-facing copy in CodeForge.
+#
+# Edit text here; rebuild the mcp-server image (./rebuild.sh) to apply.
+# The structure is validated by a Zod schema at startup — any missing or
+# extra keys cause the server to refuse to start with a clear error.
+
+# Server-level instructions delivered to the client during MCP `initialize`.
+# `preamble` holds the static text; `network.{yolo,restricted}` is appended
+# at runtime based on the active YOLO_MODE.
+instructions:
+  preamble: |
+    CodeForge is a set of tools designed to provide AI agents broad capabilities to interface with APIs in a safe manner by providing you a full TypeScript Deno sandbox to do so. Within a single call you can fetch from multiple different APIs, join and transform their data locally, then return only what's needed — instead of issuing many structured tool calls. This is an efficient way to manage your context (and cost). You can save temporary files in /tmp with your code if that helps your processing flow. Well tested scripts that have future value can be saved as skills for later use. 
+
+    Filesystem:
+      /tmp    — ephemeral
+      /skills — persistent. Browse via skill:// resources. Save with Deno.writeTextFile("/skills/<name>.ts", code).
+  network:
+    yolo: "Network: any host reachable."
+    restricted: "Network: only list_apis domains reachable."
+
+# Tool descriptions and parameter descriptions surfaced via tools/list.
+tools:
+  execute_code:
+    description: "Execute TypeScript in the sandbox."
+    params:
+      code: "TypeScript to execute. Top-level await works. Only stdout (console.log) is returned."
+      apis: "API names whose type definitions to inject into the sandbox (only useful for APIs with a configured types.d.ts)."
+      timeout: "Timeout in seconds. Default: 60."
+
+  list_apis:
+    description: "List configured APIs. Returns array of {name, description, domains, credentials, reference, restricted_methods}. Credentials: Use the literal token name as a string where the secret would go (e.g. `Authorization: 'Bearer STRIPE_AUTH_TOKEN'`) - the tool automatically substitutes token names for real secrets."
+
+  get_instructions:
+    description: "Returns CodeForge usage instructions (credential mechanic, filesystem, network model). Most MCP clients inject these at session start as a system message — call this only if you don't already have orientation for this server."
+
+  update_skill:
+    description: "Edit a saved skill by applying one or more SEARCH/REPLACE blocks."
+    params:
+      name: "Skill name (no .ts extension)."
+      patch: |
+        One or more SEARCH/REPLACE blocks, applied in order. Each block has the form:
+
+        <<<<<<< SEARCH
+        [exact existing text from the skill]
+        =======
+        [replacement text]
+        >>>>>>> REPLACE
+
+        The SEARCH text must appear in the skill source (first match is replaced). Multiple blocks may be stacked back-to-back in a single patch string.
+
+  delete_skill:
+    description: "Delete a saved skill."
+    params:
+      name: "Skill name (no .ts extension)."
+
+# Prompt descriptions surfaced via prompts/list.
+prompts:
+  run_skill:
+    description: "Load a saved skill into the conversation for execution."
+    params:
+      name: "Skill name (no .ts extension)."

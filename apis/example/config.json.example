@@ -1,0 +1,10 @@
+{
+  "description": "Stripe Payments API — payment intents, charges, customers",
+  "domains": ["api.stripe.com"],
+  "credentials": {
+    "STRIPE_AUTH_TOKEN": "sk_live_your_key_here"
+  },
+  "reference": "https://docs.stripe.com/api",
+  "restricted_methods": ["POST", "PUT", "DELETE"],
+  "active": true
+}

@@ -1,0 +1,15 @@
+.git
+.gitignore
+.dockerignore
+.claude
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/*.md
+!LICENSE.md
+tmp
+build
+tests
+docker-compose*.yaml

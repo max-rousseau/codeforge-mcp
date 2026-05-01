@@ -1,0 +1,82 @@
+services:
+  mcp-server:
+    container_name: codeforge-mcp-server
+    build:
+      context: .
+      dockerfile: mcp-server/Dockerfile
+    ports:
+      - "127.0.0.1:8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - external-net
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - proxy
+      - sandbox
+
+  proxy:
+    container_name: codeforge-proxy
+    build:
+      context: .
+      dockerfile: proxy/Dockerfile
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+    env_file:
+      - .env
+    environment:
+      - APIS_DIR=/apis
+    volumes:
+      - proxy-certs:/certs
+    networks:
+      sandbox-net:
+        ipv4_address: 10.77.0.2
+      external-net:
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "test", "-f", "/certs/mitmproxy-ca-cert.pem"]
+      interval: 5s
+      retries: 3
+
+  sandbox:
+    container_name: codeforge-sandbox
+    build:
+      context: .
+      dockerfile: sandbox/Dockerfile
+    cap_add:
+      - NET_ADMIN
+    networks:
+      sandbox-net:
+        ipv4_address: 10.77.0.3
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m
+      - /usr/local/share/ca-certificates:size=1m
+      - /etc/ssl/certs:size=1m
+    volumes:
+      - sandbox-skills:/skills
+      - proxy-certs:/certs:ro
+    mem_limit: 512m
+    cpus: 1.0
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      proxy:
+        condition: service_healthy
+
+networks:
+  sandbox-net:
+    ipam:
+      config:
+        - subnet: 10.77.0.0/24
+  external-net:
+
+volumes:
+  proxy-certs:
+  sandbox-skills:

@@ -1,0 +1,25 @@
+{
+  "name": "mcp-codeforge-tests",
+  "description": "Integration tests for the CodeForge MCP server.",
+  "private": true,
+  "license": "BSD-3-Clause",
+  "author": "Max Rousseau",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/max-rousseau/codeforge-mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/max-rousseau/codeforge-mcp/issues"
+  },
+  "homepage": "https://github.com/max-rousseau/codeforge-mcp#readme",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node tests/integration.test.mjs",
+    "test:integration": "node tests/integration.test.mjs"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  }
+}

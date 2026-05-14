@@ -7,7 +7,12 @@ import { log } from "./log.js";
 const docker = new Docker({ socketPath: "/var/run/codeforge.sock" });
 const SANDBOX_CONTAINER = "codeforge-sandbox";
 
-/** Execute TypeScript code in the Deno sandbox container via stdin, returning stdout, stderr, and exit code. */
+/**
+ * Execute TypeScript code in the Deno sandbox container via stdin, returning stdout, stderr, and exit code.
+ * The timeout is enforced in-container by wrapping `deno` with coreutils `timeout(1)` (SIGTERM, then SIGKILL
+ * after a 2s grace period). Exit codes 124 (TERM) and 137 (KILL) are surfaced as a rejected promise with
+ * an "Execution timed out" error rather than a normal ExecResult.
+ */
 export async function executeInSandbox(
   code: string,
   typeDefs: string | null,
@@ -40,6 +45,7 @@ export async function executeInSandbox(
   try {
     exec = await container.exec({
       Cmd: [
+        "timeout", "--signal=TERM", `--kill-after=2s`, `${timeoutSeconds}s`,
         "deno", "run",
         "--ext=ts",
         allowNet,
@@ -58,14 +64,9 @@ export async function executeInSandbox(
   }
 
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      log.error(`[sandbox] timed out after ${timeoutSeconds}s`);
-      reject(new Error(`Execution timed out after ${timeoutSeconds}s`));
-    }, timeoutSeconds * 1000);
-
     exec.start({ hijack: true, stdin: true }, (err: Error | null, stream: NodeJS.ReadableStream | undefined) => {
-      if (err) { clearTimeout(timeout); log.error(`[sandbox] exec start failed:`, err); return reject(err); }
-      if (!stream) { clearTimeout(timeout); log.error(`[sandbox] no stream returned`); return reject(new Error("No stream returned")); }
+      if (err) { log.error(`[sandbox] exec start failed:`, err); return reject(err); }
+      if (!stream) { log.error(`[sandbox] no stream returned`); return reject(new Error("No stream returned")); }
 
       log.info(`[sandbox] stream attached, writing stdin`);
       const writable = stream as unknown as NodeJS.WritableStream;
@@ -86,24 +87,27 @@ export async function executeInSandbox(
       );
 
       stream.on("error", (err: Error) => {
-        clearTimeout(timeout);
         log.error(`[sandbox] stream error:`, err);
         reject(err);
       });
 
       stream.on("end", async () => {
-        clearTimeout(timeout);
         try {
           const inspect = await exec.inspect();
-          log.info(`[sandbox] done: exit=${inspect.ExitCode}, stdout=${stdout.length}b, stderr=${stderr.length}b`);
+          const exitCode = inspect.ExitCode ?? 1;
+          const timedOut = exitCode === 124 || exitCode === 137;
+          log.info(`[sandbox] done: exit=${exitCode}${timedOut ? ` (timed out after ${timeoutSeconds}s)` : ""}, stdout=${stdout.length}b, stderr=${stderr.length}b`);
           if (config.debugMode) {
             if (stdout) log.info(`[sandbox] [debug] stdout:\n${stdout}`);
             if (stderr) log.info(`[sandbox] [debug] stderr:\n${stderr}`);
           }
+          if (timedOut) {
+            return reject(new Error(`Execution timed out after ${timeoutSeconds}s`));
+          }
           resolve({
             stdout,
             stderr,
-            exitCode: inspect.ExitCode ?? 1,
+            exitCode,
           });
         } catch (e) {
           log.error(`[sandbox] inspect failed:`, e);

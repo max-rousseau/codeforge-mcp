@@ -1,6 +1,7 @@
 services:
   mcp-server:
     container_name: codeforge-mcp-server
+    restart: unless-stopped
     build:
       context: .
       dockerfile: mcp-server/Dockerfile
@@ -20,6 +21,7 @@ services:
 
   proxy:
     container_name: codeforge-proxy
+    restart: unless-stopped
     build:
       context: .
       dockerfile: proxy/Dockerfile
@@ -46,6 +48,7 @@ services:
 
   sandbox:
     container_name: codeforge-sandbox
+    restart: unless-stopped
     build:
       context: .
       dockerfile: sandbox/Dockerfile

@@ -111,6 +111,16 @@ const httpServer = createServer(async (req, res) => {
   await transport.handleRequest(req, res);
 });
 
+// Node's default requestTimeout (300s) and headersTimeout (60s) abort any request
+// whose response hasn't completed in that window — which includes the long-lived SSE
+// GET streams Streamable HTTP uses for the server->client channel. Left at the default,
+// Node force-closes those streams every 5 minutes, dropping server-initiated messages
+// and forcing constant session churn. Disabled here; the port is published only on
+// 127.0.0.1 (see docker-compose.yaml), so the slowloris protection these timeouts
+// provide against untrusted clients is not relevant.
+httpServer.requestTimeout = 0;
+httpServer.headersTimeout = 0;
+
 httpServer.listen(PORT, () => {
   log.info(`CodeForge MCP server listening on port ${PORT}`);
   if (config.yoloMode) {

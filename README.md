@@ -208,9 +208,25 @@ For Claude Desktop or any MCP client that takes a JSON config:
 }
 ```
 
-For Claude Code (CLI), one command:
+For Claude Code (CLI), one command. Add `--scope user` to make CodeForge available in **every** project you open, not just the current one:
 
 ```bash
+# Global — available in all your projects
+claude mcp add --scope user --transport http codeforge http://localhost:8080/mcp
+```
+
+The `--scope` flag controls where the server is registered:
+
+| Scope | Flag | Availability |
+|-------|------|--------------|
+| `user` | `--scope user` | All projects for your user — register CodeForge once, use it everywhere. |
+| `local` | _(default)_ | Private to you in the current project only. |
+| `project` | `--scope project` | Shared with everyone via a `.mcp.json` checked into the repo. |
+
+Since CodeForge runs as a single local server on `localhost:8080`, `--scope user` is usually what you want:
+
+```bash
+# Project-local (default) — current project only
 claude mcp add --transport http codeforge http://localhost:8080/mcp
 ```
 

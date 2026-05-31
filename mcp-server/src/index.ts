@@ -25,6 +25,13 @@ function createServer_(): McpServer {
   );
   registerTools(server);
   registerSkills(server);
+  // Log the connecting client's self-reported identity once the initialize handshake completes.
+  // clientInfo is the real MCP client (e.g. Claude Cowork / claude-ai); the User-Agent logged at
+  // session init below is the transport bridge (e.g. mcp-remote), which is often different.
+  server.server.oninitialized = () => {
+    const client = server.server.getClientVersion();
+    log.info(`[mcp] client connected: ${client?.name ?? "?"} v${client?.version ?? "?"}`);
+  };
   return server;
 }
 
@@ -125,7 +132,7 @@ const httpServer = createServer(async (req, res) => {
     sessionIdGenerator: () => randomUUID(),
     onsessioninitialized: (id) => {
       transports[id] = transport;
-      log.info(`[mcp] session initialized: ${id}`);
+      log.info(`[mcp] session initialized: ${id} ua="${req.headers["user-agent"] ?? "-"}"`);
     },
   });
   transport.onerror = (err) => log.error(`[mcp] transport error sid=${transport.sessionId ?? "-"}:`, err);

@@ -34,6 +34,34 @@ function sendJsonRpcError(res: ServerResponse, status: number, code: number, mes
   res.end(JSON.stringify({ jsonrpc: "2.0", error: { code, message }, id: null }));
 }
 
+const SSE_KEEPALIVE_MS = 25_000;
+
+/**
+ * Keep a standalone GET SSE stream from idling out. The MCP server->client channel can sit with
+ * no messages for long stretches; the SDK client reads it via undici `fetch`, whose default
+ * `bodyTimeout` (300s) aborts an idle response and forces a reconnect every 5 minutes. Writing a
+ * periodic SSE comment frame (a line starting with `:`, ignored by EventSource parsers) resets
+ * that timer so the stream stays up. Node serializes `res.write`, so a whole comment frame is
+ * never interleaved into the middle of an SDK-written SSE event. The per-tick guard ensures we
+ * only write to a live event-stream response — never a 404/409 GET that resolved to plain JSON.
+ */
+function attachSseKeepAlive(res: ServerResponse): void {
+  const timer = setInterval(() => {
+    const contentType = res.getHeader("content-type");
+    const isLiveSse =
+      res.headersSent &&
+      res.statusCode === 200 &&
+      typeof contentType === "string" &&
+      contentType.includes("text/event-stream") &&
+      !res.writableEnded &&
+      !res.destroyed;
+    if (isLiveSse) res.write(": keepalive\n\n");
+  }, SSE_KEEPALIVE_MS);
+  const stop = (): void => clearInterval(timer);
+  res.on("close", stop);
+  res.on("finish", stop);
+}
+
 const httpServer = createServer(async (req, res) => {
   if (req.url === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -70,6 +98,8 @@ const httpServer = createServer(async (req, res) => {
 
   // Known session: route to its transport.
   if (sessionId && transports[sessionId]) {
+    // A GET opens the standalone server->client SSE stream; keep it from idling out.
+    if (req.method === "GET") attachSseKeepAlive(res);
     await transports[sessionId].handleRequest(req, res);
     return;
   }
@@ -111,13 +141,12 @@ const httpServer = createServer(async (req, res) => {
   await transport.handleRequest(req, res);
 });
 
-// Node's default requestTimeout (300s) and headersTimeout (60s) abort any request
-// whose response hasn't completed in that window — which includes the long-lived SSE
-// GET streams Streamable HTTP uses for the server->client channel. Left at the default,
-// Node force-closes those streams every 5 minutes, dropping server-initiated messages
-// and forcing constant session churn. Disabled here; the port is published only on
-// 127.0.0.1 (see docker-compose.yaml), so the slowloris protection these timeouts
-// provide against untrusted clients is not relevant.
+// Belt-and-suspenders for the long-lived standalone GET SSE stream (see attachSseKeepAlive).
+// The 5-minute disconnects are driven primarily by the *client's* undici bodyTimeout (300s) on
+// an idle stream — the keepalive above is the real fix. These two lines additionally disable
+// Node's own request/headers timeouts (both <=300s by default) so the server never aborts the
+// never-completing GET response from its side. Safe to disable: the port is published only on
+// 127.0.0.1 (docker-compose.yaml), so the slowloris protection they provide is not relevant.
 httpServer.requestTimeout = 0;
 httpServer.headersTimeout = 0;
 
